@@ -7,13 +7,14 @@
 
 #include <stdio.h>
 #include <iostream>
+#include <vector>
 #include <opencv2/opencv.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/gpu/gpu.hpp>
 #include <exception>
 #include <string>
-
-#include "SMblyTwoKSeventeen.h"
+#include <assert.h>
 
 using namespace std;
 
@@ -31,6 +32,9 @@ cv::Point2f centerPoint(cv::Rect rect) {
 
 int main(int argc, char **argv) {
 	cout << "Starting OpenCV algo 2k17..." << endl;
+
+	cout << "CUDA enabled GPU's found: " << cv::gpu::getCudaEnabledDeviceCount() << endl;
+	assert(cv::gpu::getCudaEnabledDeviceCount() > 0); // We need at least 1 CUDA enabled device...
 
 	// Config vars
 	bool visualSteps = false; // Will show image window for each processing step
@@ -74,6 +78,8 @@ int main(int argc, char **argv) {
 		}
 
 		if (paused) continue;
+
+		int64 start = cv::getTickCount();
 
 		if (visualSteps) cv::imshow("Webcam Unprocessed", curFrame);
 
@@ -176,8 +182,6 @@ int main(int argc, char **argv) {
 				double area = conRect.area();
 
 				cv::putText(final, "Aim: "+ to_string(aimPoint.x) + ", " + to_string(aimPoint.y), centerPoint(conRect), cv::FONT_HERSHEY_PLAIN, 0.8, cv::Scalar(255, 255, 255), 1);
-
-
 			}
 		}
 
@@ -218,6 +222,9 @@ int main(int argc, char **argv) {
 		}
 
 		cv::putText(final, "Solution: " + solution, cvPoint(3, 30), cv::FONT_HERSHEY_PLAIN, 0.8, cv::Scalar(255, 255, 255), 1);
+
+		double fps = cv::getTickFrequency() / (cv::getTickCount() - start);
+		cv::putText(final, "FPS: " + to_string(fps), cvPoint(3, 45), cv::FONT_HERSHEY_PLAIN, 0.8, cv::Scalar(255, 255, 255), 1);
 
 		cv::imshow("CV Monitor", final);
 	}
