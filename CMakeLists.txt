@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 2.6)
+project(CV2017)
+find_package(OpenCV REQUIRED)
+add_executable(CV2017 src/main.cpp)
+target_link_libraries(CV2017 ${OpenCV_LIBS})
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
