@@ -40,11 +40,11 @@ public:
 
         usbCamera.read(curRawFrame);
 
-        initialized = true;
+        finishInit();
     }
 
-    void run() {                    		// Runs one iteration of the image processing algorithm
-        if (!initialized) return;
+    double run() {                    		// Runs one iteration of the image processing algorithm
+        if (!initialized) throw std::runtime_error("Cannot run algorithm without initialization.");
         int64 start = cv::getTickCount();	// Storage for current time so that we can calculate frame rate
         
         readFrame();
@@ -53,10 +53,13 @@ public:
 		cv::Mat hslOut2;
 		cv::cvtColor(curRawFrame, hslOut2, cv::COLOR_BGR2HLS); // Convert from BGS to HLS
 
-		cv::Vec3b colorAtZeroZero = hslOut2.at<cv::Vec3b>(cv::Point(mouseX, mouseY));
-		cv::putText(hslOut2, "Color at " + to_string(mouseX) + ", " + to_string(mouseY) + " (HLS): {" + to_string(colorAtZeroZero[0]) + ", " + to_string(colorAtZeroZero[1]) + ", " + to_string(colorAtZeroZero[2]) + "}", cvPoint(0, 45), cv::FONT_HERSHEY_PLAIN, 0.8, cv::Scalar(80, 255, 255));
+		cv::Vec3b colorAtZeroZero = hslOut2.at<cv::Vec3b>(cv::Point(curRawFrame.cols / 2, curRawFrame.rows / 2));
+		cv::putText(hslOut2, "Color at " + to_string(curRawFrame.cols / 2) + ", " + to_string(curRawFrame.rows / 2) + " (HLS): {" + to_string(colorAtZeroZero[0]) + ", " + to_string(colorAtZeroZero[1]) + ", " + to_string(colorAtZeroZero[2]) + "}", cvPoint(0, 45), cv::FONT_HERSHEY_PLAIN, 0.8, cv::Scalar(80, 255, 255));
 
-		cv::imshow("Webcam Unprocessed HSL", hslOut2);
+		cv::line(hslOut2, cv::Point(curRawFrame.cols / 2, 0), cv::Point(curRawFrame.cols / 2, curRawFrame.rows), cv::Scalar(0, 255, 0), 1);
+		cv::line(hslOut2, cv::Point(0, curRawFrame.rows / 2), cv::Point(curRawFrame.cols, curRawFrame.rows / 2), cv::Scalar(0, 255, 0), 1);
+
+		cv::imshow("Webcam Unprocessed HSL - Cam #" + to_string(usbCameraNum), hslOut2);
 #endif
 
 		// HSL threshold for vision target filtering
@@ -70,7 +73,7 @@ public:
 		cv::putText(hslCpy, "HSL LBound {" + to_string(hslHue[0]) + ", " + to_string(hslSat[0]) + ", " + to_string(hslLum[0]) + "}", cvPoint(3, 15), cv::FONT_HERSHEY_PLAIN, 0.8, cv::Scalar(255, 255, 255), 1);
 		cv::putText(hslCpy, "HSL UBound {" + to_string(hslHue[1]) + ", " + to_string(hslSat[1]) + ", " + to_string(hslLum[1]) + "}", cvPoint(3, 30), cv::FONT_HERSHEY_PLAIN, 0.8, cv::Scalar(255, 255, 255), 1);
 
-		cv::imshow("HSL filter", hslCpy);
+		cv::imshow("HSL filter - Cam #" + to_string(usbCameraNum), hslCpy);
 #endif
 
 		// Find contours
@@ -90,7 +93,7 @@ public:
 
 		cv::putText(conOut, "Unfiltered contours found: " + to_string(contoursUnfiltered.size()), cvPoint(3, 15), cv::FONT_HERSHEY_PLAIN, 0.8, cv::Scalar(255, 255, 255), 1);
 
-		cv::imshow("Contours found", conOut);
+		cv::imshow("Contours found - Cam #" + to_string(usbCameraNum), conOut);
 #endif
 
 		// Filter contours
@@ -118,15 +121,16 @@ public:
 
 		cv::putText(hullOut, "Hulls found: " + to_string(contours.size()), cvPoint(3, 15), cv::FONT_HERSHEY_PLAIN, 0.8, cv::Scalar(255, 255, 255), 1);
 
-		cv::imshow("Hulls found", hullOut);
+		cv::imshow("Hulls found - Cam #" + to_string(usbCameraNum), hullOut);
 #endif
 
 		// Final image
 		cv::Mat final;
 		curRawFrame.copyTo(final);
 
-		cv::line(final, cv::Point(final.cols / 2, 0), cv::Point(final.cols / 2, final.rows), cv::Scalar(0, 255, 0), 1);
-		cv::line(final, cv::Point(0, final.rows / 2), cv::Point(final.cols, final.rows / 2), cv::Scalar(0, 255, 0), 1);
+		// Draw crosshairs
+		cv::line(final, cv::Point(final.cols / 2, 0), cv::Point(final.cols / 2, final.rows), (lockAcquired() ? cv::Scalar(0, 255, 0) : cv::Scalar(0, 0, 255)), 1);
+		cv::line(final, cv::Point(0, final.rows / 2), cv::Point(final.cols, final.rows / 2), (lockAcquired() ? cv::Scalar(0, 255, 0) : cv::Scalar(0, 0, 255)), 1);
 
 		std::vector<cv::Rect> rects(hulls.size());
 		if (hulls.size() > 0) {
@@ -142,15 +146,15 @@ public:
 				double area = conRect.area();
 
 				cv::putText(final, "Aim: "+ to_string(aimPoint.x) + ", " + to_string(aimPoint.y), centerPoint(conRect), cv::FONT_HERSHEY_PLAIN, 0.8, cv::Scalar(255, 255, 255), 1);
+
+				cv::putText(final, "Area: " + to_string(conRect.area()) + " = " + to_string(conRect.width) + "*" + to_string(conRect.height), centerPoint(conRect) + cv::Point2f(0, 15), cv::FONT_HERSHEY_PLAIN, 0.8, cv::Scalar(255, 255, 255), 1);
 			}
 		}
 
 		cv::putText(final, "Targets found: " + to_string(contours.size()), cvPoint(3, 15), cv::FONT_HERSHEY_PLAIN, 0.8, cv::Scalar(255, 255, 255), 1);
 
-		string solution = "N/A";
-
 		if (rects.size() >= 2) {
-			//TODO: Sort rects descending in area, just to ensure we pick the largest two
+			std::sort(rects.begin(), rects.end(), rectSortDesc); // Sort rectangles in descending order based on their area.
 
 			cv::Rect targ1 = rects[0];
 			cv::Rect targ2 = rects[1];
@@ -180,19 +184,23 @@ public:
 			cv::Point2f midPointNormal = aimCoordsFromPoint(midPoint, final.size());
 			cv::putText(final, "Mid: "+ to_string(midPointNormal.x) + ", " + to_string(midPointNormal.y), midPoint, cv::FONT_HERSHEY_PLAIN, 0.8, cv::Scalar(255, 255, 255), 1);
 
-			solution = to_string(midPointNormal.x);
+			solution = midPointNormal.x;
 		} else {
 			currentLock = LOCK_TYPE::NO_LOCK;
 		}
 
-		cv::putText(final, "Solution: " + solution, cvPoint(3, 30), cv::FONT_HERSHEY_PLAIN, 0.8, cv::Scalar(255, 255, 255), 1);
+		cv::putText(final, "Solution: " + to_string(solution), cvPoint(3, 30), cv::FONT_HERSHEY_PLAIN, 0.8, cv::Scalar(255, 255, 255), 1);
 
 		cFrameRate = cv::getTickFrequency() / (cv::getTickCount() - start);
 		cv::putText(final, "FPS: " + to_string(cFrameRate), cvPoint(3, 45), cv::FONT_HERSHEY_PLAIN, 0.8, cv::Scalar(255, 255, 255), 1);
 
 		cv::putText(final, "Target Locked: " + lockTypeToString(currentLock), cvPoint(3, 60), cv::FONT_HERSHEY_PLAIN, 0.8, cv::Scalar(255, 255, 255), 1);
 
-		cv::imshow("CV Monitor", final);
+		cv::putText(final, "SMblyRequired 2017 - Authored by Josh Ferrara '15", cvPoint(3, final.rows - 8), cv::FONT_HERSHEY_PLAIN, 0.8, cv::Scalar(255, 255, 255), 1);
+
+		cv::imshow("CV Monitor - Cam #" + to_string(usbCameraNum), final);
+
+		return solution;
     }
 
     double getSolution() {          // Returns current calculated solution
@@ -203,10 +211,24 @@ public:
         return cFrameRate;          
     }
 
+    LOCK_TYPE getLock() {
+    	return currentLock;
+    }
+
     bool lockAcquired() {           // Returns true if target lock is acquired
         return (currentLock != LOCK_TYPE::NO_LOCK);
     }
 private:
+    struct {
+    	bool operator() (cv::Rect a, cv::Rect b) {
+    		return b.area() < a.area();
+    	}
+    } rectSortDesc;					// Custom sort object to sort cv::Rects in descending order
+
+    void finishInit() {				// Anything that needs to be done before initialization is finalized
+    	initialized = true;
+    }
+
     void readFrame() {              // Reads a single frame from a video source
         if (curCapMethod == CAP_TYPE::USB) {
             if(!usbCamera.read(curRawFrame)) {
@@ -227,16 +249,7 @@ private:
     	return cv::Point2f(rect.x + (rect.width / 2), rect.y + (rect.height / 2));
     }
 
-    int mouseX = -1;
-    int mouseY = -1;
-    void onMouse(int event, int x, int y, int, void* windowName) {
-    	if (event == cv::EVENT_MOUSEMOVE) {
-    		mouseX = x;
-    		mouseY = y;
-    	}
-    }
-
-    double fcMinArea = 10;
+    double fcMinArea = 80;
     void filterContours(std::vector<std::vector<cv::Point>> &inputContours, std::vector<std::vector<cv::Point>> &outputContours) {
     	std::vector<cv::Point> hull;
     	outputContours.clear();

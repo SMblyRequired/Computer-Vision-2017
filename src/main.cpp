@@ -31,7 +31,13 @@ int main(int argc, char **argv) {
 	bool abort = false;
 	double paused = false;
 
-	JVision cvAlgo(0);
+	// NetworkTable::SetTeam(5805);
+	// NetworkTable::SetClientMode();
+	// NetworkTable::Initialize();
+	// std::shared_ptr<NetworkTable> vTable = NetworkTable::GetTable("Vision");
+
+	JVision cvAlgo(0);	// Create a JVision object attached to USB camera 0
+	// JVision cvAlgo(1);	// Initialize the algo for another camera. Moving the code into it's own class allows for easy multithreading in the future.
 
 	while (!abort) {
 		int keyPressed = cv::waitKey(10) & 255; // ASCII Code for pressed key
@@ -47,6 +53,11 @@ int main(int argc, char **argv) {
 		}
 
 		if (paused) continue;
-		cvAlgo.run();
+		double solution = cvAlgo.run();
+
+		// NetworkTable::PutNumber("Solution", solution);
+		// NetworkTable::PutBoolean("Locked", cvAlgo.lockAcquired());
+		// NetworkTable::PutString("CurTarget", cvAlgo.lockTypeToString(cvAlgo.getLock()));
+		// TODO: Research how to display final image on driver station :thinking_face:
 	}
 }
