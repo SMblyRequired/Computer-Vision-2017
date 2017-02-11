@@ -5,10 +5,14 @@
  *      Author: josh ferrara
  */
 
+#define VISUALSTEPS
+
 #include <string>
 #include <opencv2/opencv.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
+
+#include "jcverr.cpp"
 
 using namespace std;
 
@@ -31,19 +35,164 @@ public:
 
     JVision(int _cameraNum) : usbCameraNum(_cameraNum), curCapMethod(CAP_TYPE::USB) {
         if (!usbCamera.open(usbCameraNum)) {
-            throw "Could not open camera for read";
+            throw CameraUnavailable();
         }
 
-        usbCamera.read(curRawFrame)
+        usbCamera.read(curRawFrame);
 
         initialized = true;
     }
 
-    void run() {                    // Runs one iteration of the image processing algorithm
+    void run() {                    		// Runs one iteration of the image processing algorithm
         if (!initialized) return;
+        int64 start = cv::getTickCount();	// Storage for current time so that we can calculate frame rate
         
         readFrame();
 
+#ifdef VISUALSTEPS
+		cv::Mat hslOut2;
+		cv::cvtColor(curRawFrame, hslOut2, cv::COLOR_BGR2HLS); // Convert from BGS to HLS
+
+		cv::Vec3b colorAtZeroZero = hslOut2.at<cv::Vec3b>(cv::Point(mouseX, mouseY));
+		cv::putText(hslOut2, "Color at " + to_string(mouseX) + ", " + to_string(mouseY) + " (HLS): {" + to_string(colorAtZeroZero[0]) + ", " + to_string(colorAtZeroZero[1]) + ", " + to_string(colorAtZeroZero[2]) + "}", cvPoint(0, 45), cv::FONT_HERSHEY_PLAIN, 0.8, cv::Scalar(80, 255, 255));
+
+		cv::imshow("Webcam Unprocessed HSL", hslOut2);
+#endif
+
+		// HSL threshold for vision target filtering
+		cv::Mat hslOut;
+		cv::cvtColor(curRawFrame, hslOut, cv::COLOR_BGR2HLS); // Convert from BGS to HLS
+		cv::inRange(hslOut, cv::Scalar(hslHue[0], hslLum[0], hslSat[0]), cv::Scalar(hslHue[1], hslLum[1], hslSat[1]), hslOut); // Copy all points within range
+#ifdef VISUALSTEPS
+		cv::Mat hslCpy;
+		hslOut.copyTo(hslCpy);
+
+		cv::putText(hslCpy, "HSL LBound {" + to_string(hslHue[0]) + ", " + to_string(hslSat[0]) + ", " + to_string(hslLum[0]) + "}", cvPoint(3, 15), cv::FONT_HERSHEY_PLAIN, 0.8, cv::Scalar(255, 255, 255), 1);
+		cv::putText(hslCpy, "HSL UBound {" + to_string(hslHue[1]) + ", " + to_string(hslSat[1]) + ", " + to_string(hslLum[1]) + "}", cvPoint(3, 30), cv::FONT_HERSHEY_PLAIN, 0.8, cv::Scalar(255, 255, 255), 1);
+
+		cv::imshow("HSL filter", hslCpy);
+#endif
+
+		// Find contours
+		std::vector<std::vector<cv::Point>> contoursUnfiltered;
+		std::vector<cv::Vec4i> hierarchy;
+		cv::findContours(hslOut, contoursUnfiltered, hierarchy, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+#ifdef VISUALSTEPS
+		cv::Mat conOut;
+		curRawFrame.copyTo(conOut);
+
+		if (contoursUnfiltered.size() > 0) {
+			int i = 0;
+			for (; i >= 0; i = hierarchy[i][0]) {
+				cv::drawContours(conOut, contoursUnfiltered, i, cv::Scalar(0, 0, 255), 5);
+			}
+		}
+
+		cv::putText(conOut, "Unfiltered contours found: " + to_string(contoursUnfiltered.size()), cvPoint(3, 15), cv::FONT_HERSHEY_PLAIN, 0.8, cv::Scalar(255, 255, 255), 1);
+
+		cv::imshow("Contours found", conOut);
+#endif
+
+		// Filter contours
+		std::vector<std::vector<cv::Point>> contours;
+		filterContours(contoursUnfiltered, contours);
+
+		// Convex hulls
+		std::vector<std::vector<cv::Point>> hulls(contours.size());
+		for (size_t i = 0; i < contours.size(); i++) {
+			cv::convexHull(cv::Mat((contours)[i]), hulls[i], false);
+		}
+
+#ifdef VISUALSTEPS
+		cv::Mat hullOut;
+		curRawFrame.copyTo(hullOut);
+
+		if (hulls.size() > 0) {
+			for (int i = 0; i < hulls.size(); i++) {
+				cv::drawContours(hullOut, hulls, i, cv::Scalar(0, 0, 255), 5);
+
+				cv::Rect conRect = cv::boundingRect(hulls[i]);
+				cv::rectangle(hullOut, conRect, cv::Scalar(255, 255, 0), 2);
+			}
+		}
+
+		cv::putText(hullOut, "Hulls found: " + to_string(contours.size()), cvPoint(3, 15), cv::FONT_HERSHEY_PLAIN, 0.8, cv::Scalar(255, 255, 255), 1);
+
+		cv::imshow("Hulls found", hullOut);
+#endif
+
+		// Final image
+		cv::Mat final;
+		curRawFrame.copyTo(final);
+
+		cv::line(final, cv::Point(final.cols / 2, 0), cv::Point(final.cols / 2, final.rows), cv::Scalar(0, 255, 0), 1);
+		cv::line(final, cv::Point(0, final.rows / 2), cv::Point(final.cols, final.rows / 2), cv::Scalar(0, 255, 0), 1);
+
+		std::vector<cv::Rect> rects(hulls.size());
+		if (hulls.size() > 0) {
+			for (int i = 0; i < hulls.size(); i++) {
+				cv::drawContours(final, hulls, i, cv::Scalar(0, 0, 255), 5);
+
+				cv::Rect conRect = cv::boundingRect(hulls[i]);
+				rects[i] = conRect;
+
+				cv::rectangle(final, conRect, cv::Scalar(255, 255, 0), 2);
+
+				cv::Point2f aimPoint = aimCoordsFromPoint(centerPoint(conRect), final.size());
+				double area = conRect.area();
+
+				cv::putText(final, "Aim: "+ to_string(aimPoint.x) + ", " + to_string(aimPoint.y), centerPoint(conRect), cv::FONT_HERSHEY_PLAIN, 0.8, cv::Scalar(255, 255, 255), 1);
+			}
+		}
+
+		cv::putText(final, "Targets found: " + to_string(contours.size()), cvPoint(3, 15), cv::FONT_HERSHEY_PLAIN, 0.8, cv::Scalar(255, 255, 255), 1);
+
+		string solution = "N/A";
+
+		if (rects.size() >= 2) {
+			//TODO: Sort rects descending in area, just to ensure we pick the largest two
+
+			cv::Rect targ1 = rects[0];
+			cv::Rect targ2 = rects[1];
+
+			cv::Point2f cPoint1 = centerPoint(targ1);
+			cv::Point2f cPoint2 = centerPoint(targ2);
+
+			cv::Point2f midPoint((cPoint1.x + cPoint2.x) / 2, (cPoint1.y + cPoint2.y) / 2);
+			cv::Point2f tl(midPoint.x - 2, midPoint.y - 2);
+			cv::Point2f tr(midPoint.x + 2, midPoint.y + 2);
+
+			double t1Width = targ1.width;
+			double t1Height = targ1.height;
+
+			double t2Width = targ2.width;
+			double t2Height = targ2.height;
+
+			if (t1Width > t1Height && t2Width > t2Height) {
+				currentLock = LOCK_TYPE::BOILER;
+			} else if (t1Width < t1Height && t2Width < t2Height) {
+				currentLock = LOCK_TYPE::GEAR;
+			}
+
+			cv::line(final, cPoint1, cPoint2, cv::Scalar(0, 0, 255), 1);
+			cv::rectangle(final, tl, tr, cv::Scalar(255, 0, 0), 3);
+
+			cv::Point2f midPointNormal = aimCoordsFromPoint(midPoint, final.size());
+			cv::putText(final, "Mid: "+ to_string(midPointNormal.x) + ", " + to_string(midPointNormal.y), midPoint, cv::FONT_HERSHEY_PLAIN, 0.8, cv::Scalar(255, 255, 255), 1);
+
+			solution = to_string(midPointNormal.x);
+		} else {
+			currentLock = LOCK_TYPE::NO_LOCK;
+		}
+
+		cv::putText(final, "Solution: " + solution, cvPoint(3, 30), cv::FONT_HERSHEY_PLAIN, 0.8, cv::Scalar(255, 255, 255), 1);
+
+		cFrameRate = cv::getTickFrequency() / (cv::getTickCount() - start);
+		cv::putText(final, "FPS: " + to_string(cFrameRate), cvPoint(3, 45), cv::FONT_HERSHEY_PLAIN, 0.8, cv::Scalar(255, 255, 255), 1);
+
+		cv::putText(final, "Target Locked: " + lockTypeToString(currentLock), cvPoint(3, 60), cv::FONT_HERSHEY_PLAIN, 0.8, cv::Scalar(255, 255, 255), 1);
+
+		cv::imshow("CV Monitor", final);
     }
 
     double getSolution() {          // Returns current calculated solution
@@ -66,7 +215,42 @@ private:
         }
     }
 
+    double aimCoords(double pos, double res) {
+    	return (pos - (res / 2)) / (res / 2);
+    }
+
+    cv::Point2f aimCoordsFromPoint(cv::Point2f point, cv::Size res) {
+    	return cv::Point2f(aimCoords(point.x, (double)res.width), aimCoords(point.y, (double)res.height));
+    }
+
+    cv::Point2f centerPoint(cv::Rect rect) {
+    	return cv::Point2f(rect.x + (rect.width / 2), rect.y + (rect.height / 2));
+    }
+
+    int mouseX = -1;
+    int mouseY = -1;
+    void onMouse(int event, int x, int y, int, void* windowName) {
+    	if (event == cv::EVENT_MOUSEMOVE) {
+    		mouseX = x;
+    		mouseY = y;
+    	}
+    }
+
+    double fcMinArea = 10;
+    void filterContours(std::vector<std::vector<cv::Point>> &inputContours, std::vector<std::vector<cv::Point>> &outputContours) {
+    	std::vector<cv::Point> hull;
+    	outputContours.clear();
+    	for (std::vector<cv::Point> contour : inputContours) {
+    		cv::Rect bb = cv::boundingRect(contour);
+    		double area = cv::contourArea(contour);
+    		if (area < fcMinArea) continue;
+
+    		outputContours.push_back(contour);
+    	}
+    }
+
     cv::Mat curRawFrame;            // Raw frame from the video source
+    cv::Mat algOutput;				// Final frame for display in UI
 
     enum CAP_TYPE {                 // Capture type
         USB,
@@ -79,7 +263,7 @@ private:
     double hslSat[2] = {240, 255};  // Saturation range
     double hslLum[2] = {80, 150};   // Luminescence range
 
-    double cFrameRate;              // Current framerate/processing speed
+    double cFrameRate = 0.0;              // Current framerate/processing speed
 
     int usbCameraNum = -1;          // USB camera number
     cv::VideoCapture usbCamera;     // USB camera object
@@ -88,6 +272,6 @@ private:
 
     JVision::CAP_TYPE curCapMethod = CAP_TYPE::USB;
 
-    double solution;                // Current solution.
+    double solution = 0.0;                // Current solution.
     JVision::LOCK_TYPE currentLock = LOCK_TYPE::NO_LOCK;
 };

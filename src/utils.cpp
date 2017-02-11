@@ -10,4 +10,4 @@ public:
 	double aimCoords(double pos, double res) {
 		return (pos - (res / 2)) / (res / 2);
 	}
-}
+};
