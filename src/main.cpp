@@ -5,8 +5,6 @@
  *      Author: josh ferrara
  */
 
-// #define VISUALSTEPS
-
 #include <stdio.h>
 #include <iostream>
 #include <vector>
