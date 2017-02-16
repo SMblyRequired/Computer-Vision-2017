@@ -16,6 +16,9 @@
 #include <string>
 #include <assert.h>
 
+#include <ntcore.h>
+#include <networktables/NetworkTable.h>
+
 #include "jvision.cpp"
 
 using namespace std;
@@ -29,10 +32,11 @@ int main(int argc, char **argv) {
 	bool abort = false;
 	double paused = false;
 
-	// NetworkTable::SetTeam(5805);
-	// NetworkTable::SetClientMode();
-	// NetworkTable::Initialize();
-	// std::shared_ptr<NetworkTable> vTable = NetworkTable::GetTable("Vision");
+	NetworkTable::SetTeam(5805);
+	NetworkTable::SetClientMode();
+	NetworkTable::Initialize();
+
+	shared_ptr<NetworkTable> vTable = NetworkTable::GetTable("SmartDashboard");
 
 	JVision cvAlgo(0);	// Create a JVision object attached to USB camera 0
 	// JVision cvAlgo(1);	// Initialize the algo for another camera. Moving the code into it's own class allows for easy multithreading in the future.
@@ -53,9 +57,10 @@ int main(int argc, char **argv) {
 		if (paused) continue;
 		double solution = cvAlgo.run();
 
-		// NetworkTable::PutNumber("Solution", solution);
-		// NetworkTable::PutBoolean("Locked", cvAlgo.lockAcquired());
-		// NetworkTable::PutString("CurTarget", cvAlgo.lockTypeToString(cvAlgo.getLock()));
+
+		vTable->PutNumber("Solution", solution);
+		vTable->PutBoolean("Locked", cvAlgo.lockAcquired());
+		vTable->PutString("CurTarget", cvAlgo.lockTypeToString(cvAlgo.getLock()));
 		// TODO: Research how to display final image on driver station :thinking_face:
 	}
 }

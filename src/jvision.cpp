@@ -9,12 +9,14 @@
  *  the main processing in this file, and allow user interaction with the CV process from the main file
  */
 
-#define VISUALSTEPS
+// #define VISUALSTEPS
 
 #include <string>
 #include <opencv2/opencv.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
+
+#include <ntcore.h>
 
 #include "jcverr.cpp"
 #include "utils.cpp"
@@ -209,7 +211,9 @@ public:
 
 		cv::putText(final, "Target Locked: " + lockTypeToString(currentLock), cvPoint(3, 60), cv::FONT_HERSHEY_PLAIN, 0.8, cv::Scalar(255, 255, 255), 1);
 
-		cv::putText(final, "SMblyRequired 2017 - Authored by Josh Ferrara '15", cvPoint(3, final.rows - 8), cv::FONT_HERSHEY_PLAIN, 0.8, cv::Scalar(255, 255, 255), 1);
+		string status = "Disconnected";
+		if (nt::GetConnections().size() > 0) status = "Connected";
+		cv::putText(final, "roboRio: " + status + " | SMblyRequired 2017 - Authored by Josh Ferrara '15", cvPoint(3, final.rows - 8), cv::FONT_HERSHEY_PLAIN, 0.8, cv::Scalar(255, 255, 255), 1);
 
 		cv::imshow("CV Monitor - Cam #" + to_string(usbCameraNum), final);
 
