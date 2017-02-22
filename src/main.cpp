@@ -19,18 +19,30 @@
 #include <ntcore.h>
 #include <networktables/NetworkTable.h>
 
+#include "cscore/cscore.h"
+
 #include "jvision.cpp"
 
 using namespace std;
 
+const double HORIZ_FOV = 50.6496;
+double targetAz(double xPosNorm) {
+	return (HORIZ_FOV / 2) * xPosNorm;
+}
+
 int main(int argc, char **argv) {
-	cout << "Starting OpenCV algo 2k17..." << endl;
+	if (argc <= 1) {
+		cout << "Usage: eaglevision [cameraId] [headless 0/1]" << endl;
+		return 0;
+	}
+
+	cout << "Starting OpenCV algo 2k17 v1..." << endl;
 
 	cout << "CUDA enabled GPU's found: " << cv::gpu::getCudaEnabledDeviceCount() << endl;
 	assert(cv::gpu::getCudaEnabledDeviceCount() > 0);
 
-	bool abort = false;
-	double paused = false;
+	bool headless = (argc == 3 && stoi(argv[2]) == 1);
+	int cameraId = stoi(argv[1]);
 
 	NetworkTable::SetTeam(5805);
 	NetworkTable::SetClientMode();
@@ -38,9 +50,17 @@ int main(int argc, char **argv) {
 
 	shared_ptr<NetworkTable> vTable = NetworkTable::GetTable("SmartDashboard");
 
-	JVision cvAlgo(0);	// Create a JVision object attached to USB camera 0
-	// JVision cvAlgo(1);	// Initialize the algo for another camera. Moving the code into it's own class allows for easy multithreading in the future.
+	JVision cvAlgo(cameraId); // Initialize the algo for another camera.
+	cvAlgo.setHeadless(headless);
 
+	cs::CvSource cvSource = cs::CvSource("src", cs::VideoMode::PixelFormat::kMJPEG, 640, 480, 15);
+	cs::MjpegServer cvMjpgServer = cs::MjpegServer("server", 1180 + cameraId);
+	cvMjpgServer.SetSource(cvSource);
+
+	cout << "MJpeg stream available at port " << (1180 + cameraId) << endl;
+
+	bool abort = false;
+	bool paused = false;
 	while (!abort) {
 		int keyPressed = cv::waitKey(10) & 255; // ASCII Code for pressed key
 
@@ -57,10 +77,15 @@ int main(int argc, char **argv) {
 		if (paused) continue;
 		double solution = cvAlgo.run();
 
+		if (cvAlgo.lockAcquired()) {
+			cout << "Target angle: " << targetAz(solution) << endl;
+		}
 
-		vTable->PutNumber("Solution", solution);
-		vTable->PutBoolean("Locked", cvAlgo.lockAcquired());
-		vTable->PutString("CurTarget", cvAlgo.lockTypeToString(cvAlgo.getLock()));
-		// TODO: Research how to display final image on driver station :thinking_face:
+		cvSource.PutFrame(cvAlgo.getVisionOutput());
+
+		vTable->PutNumber("Solution" + to_string(cameraId), solution);
+		vTable->PutBoolean("Locked" + to_string(cameraId), cvAlgo.lockAcquired());
+		vTable->PutString("CurTarget" + to_string(cameraId), cvAlgo.lockTypeToString(cvAlgo.getLock()));
+		// TODO: We can use cscore here to send image to DS - going to need to do more research on this
 	}
 }

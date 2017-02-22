@@ -50,6 +50,10 @@ public:
         finishInit();
     }
 
+    void setHeadless(bool _headless) {
+    	headless = _headless;
+    }
+
     double run() {                    		// Runs one iteration of the image processing algorithm
         if (!initialized) throw std::runtime_error("Cannot run algorithm without initialization.");
         int64 start = cv::getTickCount();	// Storage for current time so that we can calculate frame rate
@@ -215,9 +219,14 @@ public:
 		if (nt::GetConnections().size() > 0) status = "Connected";
 		cv::putText(final, "roboRio: " + status + " | SMblyRequired 2017 - Authored by Josh Ferrara '15", cvPoint(3, final.rows - 8), cv::FONT_HERSHEY_PLAIN, 0.8, cv::Scalar(255, 255, 255), 1);
 
-		cv::imshow("CV Monitor - Cam #" + to_string(usbCameraNum), final);
+		if (!headless) cv::imshow("CV Monitor - Cam #" + to_string(usbCameraNum), final);
+		final.copyTo(algOutput);
 
 		return solution;
+    }
+
+    cv::Mat& getVisionOutput() {
+    	return algOutput;
     }
 
     double getSolution() {          // Returns current calculated solution
@@ -288,6 +297,7 @@ private:
     };
 
     bool initialized = false;       // Are we ready to process images?
+    bool headless = false;			// Headless mode will disable imgshows
 
     double hslHue[2] = {60, 75};    // Hue range
     double hslSat[2] = {240, 255};  // Saturation range
