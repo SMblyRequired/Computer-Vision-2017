@@ -38,9 +38,6 @@ int main(int argc, char **argv) {
 
 	cout << "Starting OpenCV algo 2k17 v1..." << endl;
 
-	cout << "CUDA enabled GPU's found: " << cv::gpu::getCudaEnabledDeviceCount() << endl;
-	assert(cv::gpu::getCudaEnabledDeviceCount() > 0);
-
 	bool headless = (argc == 3 && stoi(argv[2]) == 1);
 	int cameraId = stoi(argv[1]);
 
