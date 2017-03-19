@@ -21,4 +21,6 @@ cmake -D WITH_TBB=OFF -D WITH_OPENMP=OFF -D WITH_IPP=OFF -D ENABLE_PROFILING=ON 
 make -j8
 sudo make install
 
+rm -rf /tmp/eaglevision
+
 echo "Dependency installation complete!" 
