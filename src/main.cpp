@@ -35,9 +35,11 @@ int main(int argc, char **argv) {
 
 	cout << "Starting OpenCV algo 2k17 v1..." << endl;
 	cout << "\tOpenCV Version: " << CV_VERSION << endl;
-	// assert(CV_VERSION == "3.2.0"); // This code has only been tested to work on OpenCV 3.2.0
 
 	bool headless = (argc == 3 && stoi(argv[2]) == 1);
+
+	cout << "\tRunning headless: " << (headless == 1 ? "yes" : "no") << endl;
+
 	int cameraId = stoi(argv[1]);
 
 	NetworkTable::SetTeam(5805);
