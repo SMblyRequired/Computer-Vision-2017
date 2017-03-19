@@ -9,7 +9,7 @@
  *  the main processing in this file, and allow user interaction with the CV process from the main file
  */
 
-// #define VISUALSTEPS
+#define VISUALSTEPS
 
 #include <string>
 #include <opencv2/opencv.hpp>
@@ -299,9 +299,12 @@ private:
     bool initialized = false;       // Are we ready to process images?
     bool headless = false;			// Headless mode will disable imgshows
 
-    double hslHue[2] = {60, 75};    // Hue range
-    double hslSat[2] = {240, 255};  // Saturation range
-    double hslLum[2] = {80, 150};   // Luminescence range
+    double hslHue[2] = {0, 10};    // Hue range
+//    double hslHue[2] = {60, 75};    // Hue range
+//    double hslSat[2] = {240, 255};  // Saturation range
+    double hslSat[2] = {0, 10};  // Saturation range
+    double hslLum[2] = {210, 230};   // Luminescence range
+//    double hslLum[2] = {80, 150};   // Luminescence range
 
     double cFrameRate = 0.0;        // Current framerate/processing speed
 

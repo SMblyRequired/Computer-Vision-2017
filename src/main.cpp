@@ -11,15 +11,12 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
-#include <opencv2/gpu/gpu.hpp>
 #include <exception>
 #include <string>
 #include <assert.h>
 
-#include <ntcore.h>
 #include <networktables/NetworkTable.h>
-
-#include "cscore/cscore.h"
+#include <cscore.h>
 
 #include "jvision.cpp"
 
@@ -37,6 +34,8 @@ int main(int argc, char **argv) {
 	}
 
 	cout << "Starting OpenCV algo 2k17 v1..." << endl;
+	cout << "\tOpenCV Version: " << CV_VERSION << endl;
+	assert(CV_VERSION == "3.2.0"); // This code has only been tested to work on OpenCV 3.2.0
 
 	bool headless = (argc == 3 && stoi(argv[2]) == 1);
 	int cameraId = stoi(argv[1]);
@@ -83,6 +82,5 @@ int main(int argc, char **argv) {
 		vTable->PutNumber("Solution" + to_string(cameraId), solution);
 		vTable->PutBoolean("Locked" + to_string(cameraId), cvAlgo.lockAcquired());
 		vTable->PutString("CurTarget" + to_string(cameraId), cvAlgo.lockTypeToString(cvAlgo.getLock()));
-		// TODO: We can use cscore here to send image to DS - going to need to do more research on this
 	}
 }

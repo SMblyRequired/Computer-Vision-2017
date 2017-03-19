@@ -6,6 +6,7 @@
  */
 
 #include <opencv2/core.hpp>
+#include <opencv2/imgproc.hpp>
 
 class JUtils {
 public:
