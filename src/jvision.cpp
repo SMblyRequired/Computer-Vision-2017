@@ -32,7 +32,11 @@ public:
     static string lockTypeToString(JVision::LOCK_TYPE cur) {
         if (cur == NO_LOCK) return "UNLOCKED";
         return (cur == BOILER ? "BOILER" : "GEAR");
-    }
+	}
+	
+	JVision() : curCapMethod(CAP_TYPE::FILE) {
+		finishInit();
+	}
 
     JVision(string _networkAddress) : networkAddress(_networkAddress), curCapMethod(CAP_TYPE::NETWORK) {
         throw "Networked cameras not yet supported";
@@ -53,20 +57,38 @@ public:
     }
 
     double run() {                    		// Runs one iteration of the image processing algorithm
-        if (!initialized) throw std::runtime_error("Cannot run algorithm without initialization.");
+		if (!initialized) throw std::runtime_error("Cannot run algorithm without initialization.");
         int64 start = cv::getTickCount();	// Storage for current time so that we can calculate frame rate
         
         readFrame();
 
 #ifdef VISUALSTEPS
 		cv::Mat hslOut2;
-		cv::cvtColor(curRawFrame, hslOut2, cv::COLOR_BGR2HLS); // Convert from BGS to HLS
+		cv::cvtColor(curRawFrame, hslOut2, cv::COLOR_BGR2HLS); // Convert from BGR to HLS
 
-		cv::Vec3b colorAtZeroZero = hslOut2.at<cv::Vec3b>(cv::Point(curRawFrame.cols / 2, curRawFrame.rows / 2));
-		cv::putText(hslOut2, "Color at " + to_string(curRawFrame.cols / 2) + ", " + to_string(curRawFrame.rows / 2) + " (HLS): {" + to_string(colorAtZeroZero[0]) + ", " + to_string(colorAtZeroZero[1]) + ", " + to_string(colorAtZeroZero[2]) + "}", cvPoint(0, 45), cv::FONT_HERSHEY_PLAIN, 0.8, cv::Scalar(80, 255, 255));
+		cv::putText(hslOut2, "Format: Hue, Luminance, Saturation", cvPoint(5, 10), cv::FONT_HERSHEY_PLAIN, 0.7, cv::Scalar(255, 255, 255));
 
 		cv::line(hslOut2, cv::Point(curRawFrame.cols / 2, 0), cv::Point(curRawFrame.cols / 2, curRawFrame.rows), cv::Scalar(0, 255, 0), 1);
 		cv::line(hslOut2, cv::Point(0, curRawFrame.rows / 2), cv::Point(curRawFrame.cols, curRawFrame.rows / 2), cv::Scalar(0, 255, 0), 1);
+
+		// Create a grid of points with color values
+		for (int i = 1; i <= 9; i++) {
+			for (int j = 1; j <= 9; j++) {
+				int pointX = (double)hslOut2.cols * ((double)i/10.0);
+				pointX--;
+				int pointY = (double)hslOut2.rows * ((double)j/10.0);
+				pointY--;
+
+				cv::Vec3b colorAtPoint = hslOut2.at<cv::Vec3b>(cv::Point(pointX, pointY));
+
+				cv::rectangle(hslOut2, cv::Point(pointX, pointY), cv::Point(pointX + 2, pointY + 2), cv::Scalar(255, 255, 255), 1);
+
+				// Calculate width of text
+				string colorVals(to_string(colorAtPoint[0]) + "," + to_string(colorAtPoint[1]) + "," + to_string(colorAtPoint[2]));
+				cv::Size textSize = cv::getTextSize(colorVals, cv::FONT_HERSHEY_PLAIN, 0.7, 1, nullptr);
+				cv::putText(hslOut2, colorVals, cvPoint(pointX - textSize.width / 2, pointY), cv::FONT_HERSHEY_PLAIN, 0.7, cv::Scalar(255, 255, 255));
+			}
+		}
 
 		cv::imshow("Webcam Unprocessed HSL - Cam #" + to_string(usbCameraNum), hslOut2);
 #endif
@@ -241,7 +263,11 @@ public:
 
     bool lockAcquired() {           // Returns true if target lock is acquired
         return (currentLock != LOCK_TYPE::NO_LOCK);
-    }
+	}
+	
+	void setFrame(cv::Mat newFrame) {
+		curRawFrame = newFrame;
+	}
 private:
     struct {
     	bool operator() (cv::Rect a, cv::Rect b) {
@@ -258,7 +284,9 @@ private:
             if(!usbCamera.read(curRawFrame)) {
                 throw "Error reading frame from camera.";
             }
-        }
+        } else if (curCapMethod == CAP_TYPE::FILE) {
+
+		}
     }
 
     double aimCoords(double pos, double res) {
@@ -291,14 +319,15 @@ private:
 
     enum CAP_TYPE {                 // Capture type
         USB,
-        NETWORK
+		NETWORK,
+		FILE
     };
 
     bool initialized = false;       // Are we ready to process images?
     bool headless = false;			// Headless mode will disable imgshows
 
-    double hslHue[2] = {60, 75};    // Hue range
-    double hslSat[2] = {240, 255};  // Saturation range
+    double hslHue[2] = {35, 75};    // Hue range
+    double hslSat[2] = {60, 255};  // Saturation range
     double hslLum[2] = {80, 150};   // Luminescence range
 
     double cFrameRate = 0.0;        // Current framerate/processing speed
