@@ -104,10 +104,10 @@ int main(int argc, char **argv) {
 	cout << "MJpeg stream available at port " << (1180 + cameraId) << endl;
 
 	if (CALIBRATION) {
-		cv::namedWindow("Calibration");
+		cv::namedWindow("Calibration", 0);
 		
 		if (videoFile) {
-			cv::createTrackbar("Frame", "Calibration", &_calCurFrame, numFrames, _onTrackbarChangeDoNothing);
+			cv::createTrackbar("Frame", "Calibration", &_calCurFrame, numFrames - 1, _onTrackbarChangeDoNothing);
 		}
 		
 		cv::createTrackbar("Hue Low", "Calibration", &_calLowHue, 255, _onTrackbarChangeDoNothing);
