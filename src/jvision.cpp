@@ -266,7 +266,31 @@ public:
 	}
 	
 	void setFrame(cv::Mat newFrame) {
-		curRawFrame = newFrame;
+		newFrame.copyTo(curRawFrame);
+	}
+
+	void setHueBoundLower(int newVal) {
+		hslHue[0] = newVal;
+	}
+
+	void setHueBoundUpper(int newVal) {
+		hslHue[1] = newVal;
+	}
+
+	void setLumBoundLower(int newVal) {
+		hslLum[0] = newVal;
+	}
+
+	void setLumBoundUpper(int newVal) {
+		hslLum[1] = newVal;
+	}
+
+	void setSatBoundLower(int newVal) {
+		hslSat[0] = newVal;
+	}
+
+	void setSatBoundUpper(int newVal) {
+		hslSat[1] = newVal;
 	}
 private:
     struct {
@@ -326,9 +350,17 @@ private:
     bool initialized = false;       // Are we ready to process images?
     bool headless = false;			// Headless mode will disable imgshows
 
-    double hslHue[2] = {35, 75};    // Hue range
-    double hslSat[2] = {60, 255};  // Saturation range
-    double hslLum[2] = {80, 150};   // Luminescence range
+    // double hslHue[2] = {35, 75};    // Hue range
+    // double hslSat[2] = {60, 255};  // Saturation range
+	// double hslLum[2] = {80, 150};   // Luminescence range
+	
+	// double hslHue[2] = {80, 95};    // Hue range
+	// double hslLum[2] = {0, 255};   // Luminescence range
+	// double hslSat[2] = {60, 255};  // Saturation range
+	
+	double hslHue[2] = {47, 90};    // Hue range
+	double hslLum[2] = {18, 255};   // Luminescence range
+    double hslSat[2] = {143, 255};  // Saturation range
 
     double cFrameRate = 0.0;        // Current framerate/processing speed
 
