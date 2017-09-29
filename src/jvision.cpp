@@ -97,6 +97,20 @@ public:
 		cv::Mat hslOut;
 		cv::cvtColor(curRawFrame, hslOut, cv::COLOR_BGR2HLS); // Convert from BGS to HLS
 		cv::inRange(hslOut, cv::Scalar(hslHue[0], hslLum[0], hslSat[0]), cv::Scalar(hslHue[1], hslLum[1], hslSat[1]), hslOut); // Copy all points within range
+
+		cv::Mat element = (cv::Mat_<uchar>(3,3) << 0,1,0,0,1,0,0,1,0);
+
+		cv::Mat beforeNoiseReduction;
+		hslOut.copyTo(beforeNoiseReduction);
+
+		cv::Mat tmpHsl;
+		cv::erode(hslOut, tmpHsl, element, cv::Point(-1,-1), 3); // Remove noise
+
+		tmpHsl.copyTo(hslOut);
+
+		cv::dilate(hslOut, tmpHsl, element, cv::Point(-1,-1), 6);
+		tmpHsl.copyTo(hslOut);
+
 #ifdef VISUALSTEPS
 		cv::Mat hslCpy;
 		hslOut.copyTo(hslCpy);
@@ -105,6 +119,7 @@ public:
 		cv::putText(hslCpy, "HSL UBound {" + to_string(hslHue[1]) + ", " + to_string(hslSat[1]) + ", " + to_string(hslLum[1]) + "}", cvPoint(3, 30), cv::FONT_HERSHEY_PLAIN, 0.8, cv::Scalar(255, 255, 255), 1);
 
 		cv::imshow("HSL filter - Cam #" + to_string(usbCameraNum), hslCpy);
+		cv::imshow("HSL filter - no noise reduction", beforeNoiseReduction);
 #endif
 
 		// Find contours
@@ -135,8 +150,11 @@ public:
 		std::vector<std::vector<cv::Point>> hulls(contours.size());
 		for (size_t i = 0; i < contours.size(); i++) {
 			cv::convexHull(cv::Mat((contours)[i]), hulls[i], false);
-		}
 
+			// double epsilon = 0.1 * arcLength(contours[i],true);
+			// cv::approxPolyDP(contours[i], hulls[i], epsilon, true);
+		}
+		
 #ifdef VISUALSTEPS
 		cv::Mat hullOut;
 		curRawFrame.copyTo(hullOut);
@@ -181,9 +199,9 @@ public:
 				cv::Point2f aimPoint = aimCoordsFromPoint(centerPoint(conRect), final.size());
 				double area = conRect.area();
 
-				cv::putText(final, "Aim: "+ to_string(aimPoint.x) + ", " + to_string(aimPoint.y), centerPoint(conRect), cv::FONT_HERSHEY_PLAIN, 0.8, cv::Scalar(255, 255, 255), 1);
+				// cv::putText(final, "Aim: "+ to_string(aimPoint.x) + ", " + to_string(aimPoint.y), centerPoint(conRect), cv::FONT_HERSHEY_PLAIN, 0.8, cv::Scalar(255, 255, 255), 1);
 
-				cv::putText(final, "Area: " + to_string(conRect.area()) + " = " + to_string(conRect.width) + "*" + to_string(conRect.height), centerPoint(conRect) + cv::Point2f(0, 15), cv::FONT_HERSHEY_PLAIN, 0.8, cv::Scalar(255, 255, 255), 1);
+				// cv::putText(final, "Area: " + to_string(conRect.area()) + " = " + to_string(conRect.width) + "*" + to_string(conRect.height), centerPoint(conRect) + cv::Point2f(0, 15), cv::FONT_HERSHEY_PLAIN, 0.8, cv::Scalar(255, 255, 255), 1);
 			}
 		}
 

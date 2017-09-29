@@ -43,10 +43,16 @@ void _onTrackbarChangeDoNothing( int, void* ) {}
 // END OF CALIBRATION VARIABLES/METHODS
 
 int main(int argc, char **argv) {
+	/*
+		Notes for testing against FRC provided vision dataset for Steamworks
+		*) Boiler requires less erosion
+		*) HSL bounds: H[82, 93], S[158, 255], L[41, 255]
+	*/
+
 	// Command line option handling
 	cxxopts::Options options("EagleVision 2017", "Computer vision algorithm for FRC Steamworks. FRC5805.");
 	options.add_options()
-	("c,calibration", "Enter calibration mode")
+	("C,calibration", "Enter calibration mode")
 	("H,headless", "Run in headless mode")
 	("h,help", "Display this help screen")
 	("n,camId", "Camera ID", cxxopts::value<int>())
@@ -158,7 +164,7 @@ int main(int argc, char **argv) {
 		double solution = cvAlgo.run();
 
 		if (cvAlgo.lockAcquired()) {
-			cout << "Target angle: " << targetAz(solution) << endl;
+			// cout << "Target angle: " << targetAz(solution) << endl;
 		}
 
 		cvSource.PutFrame(cvAlgo.getVisionOutput());
